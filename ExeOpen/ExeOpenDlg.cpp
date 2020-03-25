@@ -7,23 +7,18 @@
 #include "ExeOpenDlg.h"
 #include "afxdialogex.h"
 
-#include <fstream>
 #include <TlHelp32.h>
-#include <iostream>
 #include <Windows.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
 
-
 // диалоговое окно CExeOpenDlg
-
-
 
 CExeOpenDlg::CExeOpenDlg(CWnd* pParent /*=NULL*/)
 	: CDialogEx(CExeOpenDlg::IDD, pParent)
-	, way_of_system(_T("C:\\Windows\\System32\\*.exe"))
+	, way_of_system(L"C:\\Windows\\System32\\*.exe")
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -42,7 +37,6 @@ BEGIN_MESSAGE_MAP(CExeOpenDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_START, &CExeOpenDlg::OnBnClickedStart)
 	ON_BN_CLICKED(IDC_TERMINATE, &CExeOpenDlg::OnBnClickedTerminate)
 	ON_EN_CHANGE(IDC_EDIT_WAY, &CExeOpenDlg::OnChangeEditWay)
-	ON_WM_LBUTTONDOWN()
 	ON_WM_TIMER()
 END_MESSAGE_MAP()
 
@@ -60,6 +54,7 @@ BOOL CExeOpenDlg::OnInitDialog()
 
 	// TODO: добавьте дополнительную инициализацию
 
+	OnChangeEditWay();
 	SetTimer(1, 500, NULL);
 
 	return TRUE;  // возврат значения TRUE, если фокус не передан элементу управления
@@ -113,16 +108,30 @@ void CExeOpenDlg::OnBnClickedStart()
 	CString ProcessName = NULL;
 	list_exe.GetText(nSel, ProcessName);
 
-	BOOL bSuccess = CreateProcess(NULL, ProcessName.GetBuffer(), NULL, NULL, FALSE, NULL, NULL, NULL, &si, &pi);
+	// склеиваем строки, содержащие путь и имя файла
+	CString truepath = NULL;
+	for (int i = 0; i < way_of_system.GetLength(); i++)
+	{
+		if (way_of_system[i] != '*')		// условие на "удаление" ненужной части пути (*.exe)
+		{
+			truepath.Insert(way_of_system.GetLength(), way_of_system[i]);	// записываем это в новую строку
+		}
+		else break;
+	}
+	truepath.Insert(way_of_system.GetLength(), ProcessName);	// полученный путь склеиваем с именем файла, результат передаем в CreateProcess
+
+
+	//MessageBox(truepath, L"Путь", MB_OK | MB_ICONASTERISK);		** MessageBox как проверка результата абсолютного пути
+	
+	BOOL bSuccess = CreateProcess(NULL, truepath.GetBuffer(), NULL, NULL, FALSE, NULL, NULL, NULL, &si, &pi);
 	if (!bSuccess) {
 		MessageBox(L"Процесс не найден!", L"ERROR", MB_OK | MB_ICONERROR);
 	}
 	else {
 		int index = open_exe.AddString(ProcessName);
-		open_exe.SetItemData(index, (DWORD_PTR)pi.hProcess);
+		open_exe.SetItemData(index, (DWORD_PTR)pi.hProcess);	// связываем имя процесса с его handle
 	}
 }
-
 
 void CExeOpenDlg::OnBnClickedTerminate()
 {
@@ -143,7 +152,6 @@ void CExeOpenDlg::OnBnClickedTerminate()
 	}
 }
 
-
 void CExeOpenDlg::OnChangeEditWay()
 {
 	// TODO:  Если это элемент управления RICHEDIT, то элемент управления не будет
@@ -162,14 +170,6 @@ void CExeOpenDlg::OnChangeEditWay()
 		CString filename = find_file.GetFileName();
 		list_exe.AddString(filename);
 	}
-}
-
-
-void CExeOpenDlg::OnLButtonDown(UINT nFlags, CPoint point)
-{
-	// TODO: добавьте свой код обработчика сообщений или вызов стандартного
-
-	CDialogEx::OnLButtonDown(nFlags, point);
 }
 
 void CExeOpenDlg::OnTimer(UINT_PTR nIDEvent)
